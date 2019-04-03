@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Atos Spain S.A
+ * Copyright 2019 Atos Spain S.A
  *
  * This file is part of iotagent-lora
  *
@@ -23,15 +23,15 @@
 
 var request = require('request');
 var async = require('async');
-var test = require('unit.js');
 var iotAgentConfig = require('../config-test.js');
 var utils = require('../utils');
 var iotagentLora = require('../../');
 var iotAgentLib = require('iotagent-node-lib');
 var mqtt = require('mqtt');
 var CBOR = require('cbor-sync');
+var should = require('chai').should();
 
-describe('CBOR Attributes', function () {
+describe('CBOR Attributes', function() {
     var testMosquittoHost = 'localhost';
     var orionHost = iotAgentConfig.iota.contextBroker.host;
     var orionPort = iotAgentConfig.iota.contextBroker.port;
@@ -39,7 +39,7 @@ describe('CBOR Attributes', function () {
     var service = 'smartgondor';
     var subservice = '/gardens';
 
-    function readEnvVariables () {
+    function readEnvVariables() {
         if (process.env.TEST_MOSQUITTO_HOST) {
             testMosquittoHost = process.env.TEST_MOSQUITTO_HOST;
         }
@@ -61,23 +61,29 @@ describe('CBOR Attributes', function () {
         }
     }
 
-    before(function (done) {
+    before(function(done) {
         readEnvVariables();
-        async.series([
-            async.apply(utils.deleteEntityCB, iotAgentConfig.iota.contextBroker, service, subservice, 'LORA-N-003'),
-            async.apply(iotagentLora.start, iotAgentConfig)
-        ], done);
+        async.series(
+            [
+                async.apply(utils.deleteEntityCB, iotAgentConfig.iota.contextBroker, service, subservice, 'LORA-N-003'),
+                async.apply(iotagentLora.start, iotAgentConfig)
+            ],
+            done
+        );
     });
 
-    after(function (done) {
-        async.series([
-            iotAgentLib.clearAll,
-            iotagentLora.stop,
-            async.apply(utils.deleteEntityCB, iotAgentConfig.iota.contextBroker, service, subservice, 'LORA-N-003')
-        ], done);
+    after(function(done) {
+        async.series(
+            [
+                iotAgentLib.clearAll,
+                iotagentLora.stop,
+                async.apply(utils.deleteEntityCB, iotAgentConfig.iota.contextBroker, service, subservice, 'LORA-N-003')
+            ],
+            done
+        );
     });
 
-    describe('When a device provisioning request with all the required data arrives to the IoT Agent. CBOR data model', function () {
+    describe('When a device provisioning request with all the required data arrives to the IoT Agent. CBOR data model', function() {
         var options = {
             url: 'http://localhost:' + iotAgentConfig.iota.server.port + '/iot/devices',
             method: 'POST',
@@ -97,30 +103,34 @@ describe('CBOR Attributes', function () {
             }
         };
 
-        it('should add the device to the devices list', function (done) {
+        it('should add the device to the devices list', function(done) {
             if (testMosquittoHost) {
-                options.json.devices[0]['internal_attributes']['lorawan']['application_server']['host'] = testMosquittoHost;
+                /* eslint-disable-next-line  standard/computed-property-even-spacing */
+                options.json.devices[0]['internal_attributes']['lorawan']['application_server'][
+                    'host'
+                ] = testMosquittoHost;
             }
 
-            request(options, function (error, response, body) {
-                test.should.not.exist(error);
-                test.object(response).hasProperty('statusCode', 201);
-                setTimeout(function () {
-                    request(optionsGetDevice, function (error, response, body) {
-                        test.should.not.exist(error);
-                        test.object(response).hasProperty('statusCode', 200);
-                        test.object(body).hasProperty('count', 1);
-                        test.object(body).hasProperty('devices');
-                        test.array(body.devices);
-                        test.array(body.devices).hasLength(1);
-                        test.object(body.devices[0]).hasProperty('device_id', options.json.devices[0]['device_id']);
+            request(options, function(error, response, body) {
+                should.not.exist(error);
+                response.should.be.an('object');
+                response.should.have.property('statusCode', 201);
+                setTimeout(function() {
+                    request(optionsGetDevice, function(error, response, body) {
+                        should.not.exist(error);
+                        response.should.have.property('statusCode', 200);
+                        body.should.have.property('count', 1);
+                        body.should.have.property('devices');
+                        body.devices.should.be.an('array');
+                        body.devices.should.have.length(1);
+                        body.devices[0].should.have.property('device_id', options.json.devices[0]['device_id']);
                         done();
                     });
                 }, 500);
             });
         });
 
-        it('should register the entity in the CB', function (done) {
+        it('should register the entity in the CB', function(done) {
             var optionsCB = {
                 url: 'http://' + orionServer + '/v2/entities/' + options.json.devices[0]['entity_name'],
                 method: 'GET',
@@ -131,15 +141,15 @@ describe('CBOR Attributes', function () {
                 }
             };
 
-            request(optionsCB, function (error, response, body) {
-                test.should.not.exist(error);
-                test.object(response).hasProperty('statusCode', 200);
-                test.object(body).hasProperty('id', options.json.devices[0]['entity_name']);
+            request(optionsCB, function(error, response, body) {
+                should.not.exist(error);
+                response.should.have.property('statusCode', 200);
+                body.should.have.property('id', options.json.devices[0]['entity_name']);
                 done();
             });
         });
 
-        it('Should process correctly active attributes represented in CBOR model', function (done) {
+        it('Should process correctly active attributes represented in CBOR model', function(done) {
             var rawJSONPayload = {
                 barometric_pressure_0: 0,
                 digital_in_3: 100,
@@ -162,16 +172,22 @@ describe('CBOR Attributes', function () {
             var attributesExample = utils.readExampleFile('./test/activeAttributes/emptyCbor.json');
             attributesExample['payload_raw'] = encodedBuffer.toString('base64');
             var client = mqtt.connect('mqtt://' + testMosquittoHost);
-            client.on('connect', function () {
-                client.publish(options.json.devices[0]['internal_attributes']['lorawan']['application_id'] + '/devices/' + options.json.devices[0]['device_id'] + '/up', JSON.stringify(attributesExample));
-                setTimeout(function () {
-                    request(optionsCB, function (error, response, body) {
-                        test.should.not.exist(error);
-                        test.object(response).hasProperty('statusCode', 200);
-                        test.object(body).hasProperty('id', options.json.devices[0]['entity_name']);
-                        test.object(body).hasProperty('temperature_1');
-                        test.object(body['temperature_1']).hasProperty('type', 'Number');
-                        test.object(body['temperature_1']).hasProperty('value', 27.2);
+            client.on('connect', function() {
+                client.publish(
+                    options.json.devices[0]['internal_attributes']['lorawan']['application_id'] +
+                        '/devices/' +
+                        options.json.devices[0]['device_id'] +
+                        '/up',
+                    JSON.stringify(attributesExample)
+                );
+                setTimeout(function() {
+                    request(optionsCB, function(error, response, body) {
+                        should.not.exist(error);
+                        response.should.have.property('statusCode', 200);
+                        body.should.have.property('id', options.json.devices[0]['entity_name']);
+                        body.should.have.property('temperature_1');
+                        body.temperature_1.should.have.property('type', 'Number');
+                        body.temperature_1.should.have.property('value', 27.2);
                         client.end();
                         done();
                     });
@@ -180,8 +196,8 @@ describe('CBOR Attributes', function () {
         });
     });
 
-    describe('Active attributes are reported using attributes alias', function () {
-        it('Should process correctly active attributes', function (done) {
+    describe('Active attributes are reported using attributes alias', function() {
+        it('Should process correctly active attributes', function(done) {
             var optionsCB = {
                 url: 'http://' + orionServer + '/v2/entities/LORA-N-003',
                 method: 'GET',
@@ -203,16 +219,16 @@ describe('CBOR Attributes', function () {
             var attributesExample = utils.readExampleFile('./test/activeAttributes/emptyCbor.json');
             attributesExample['payload_raw'] = encodedBuffer.toString('base64');
             var client = mqtt.connect('mqtt://' + testMosquittoHost);
-            client.on('connect', function () {
+            client.on('connect', function() {
                 client.publish('ari_ioe_app_demo1/devices/lora_n_003/up', JSON.stringify(attributesExample));
-                setTimeout(function () {
-                    request(optionsCB, function (error, response, body) {
-                        test.should.not.exist(error);
-                        test.object(response).hasProperty('statusCode', 200);
-                        test.object(body).hasProperty('id', 'LORA-N-003');
-                        test.object(body).hasProperty('temperature_1');
-                        test.object(body['temperature_1']).hasProperty('type', 'Number');
-                        test.object(body['temperature_1']).hasProperty('value', 27.2);
+                setTimeout(function() {
+                    request(optionsCB, function(error, response, body) {
+                        should.not.exist(error);
+                        response.should.have.property('statusCode', 200);
+                        body.should.have.property('id', 'LORA-N-003');
+                        body.should.have.property('temperature_1');
+                        body.temperature_1.should.have.property('type', 'Number');
+                        body.temperature_1.should.have.property('value', 27.2);
                         client.end();
                         done();
                     });
@@ -221,14 +237,14 @@ describe('CBOR Attributes', function () {
         });
     });
 
-    describe('Active attributes are reported with incorrect format', function () {
-        it('Should process correctly active attributes', function (done) {
+    describe('Active attributes are reported with incorrect format', function() {
+        it('Should process correctly active attributes', function(done) {
             var attributesExample = utils.readExampleFile('./test/activeAttributes/emptyCbor.json');
             attributesExample['payload_raw'] = 'no_cbor_payload';
             var client = mqtt.connect('mqtt://' + testMosquittoHost);
-            client.on('connect', function () {
+            client.on('connect', function() {
                 client.publish('ari_ioe_app_demo1/devices/lora_n_003/up', JSON.stringify(attributesExample));
-                setTimeout(function () {
+                setTimeout(function() {
                     client.end();
                     done();
                 }, 500);

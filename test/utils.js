@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Atos Spain S.A
+ * Copyright 2019 Atos Spain S.A
  *
  * This file is part of iotagent-lora
  *
@@ -25,7 +25,7 @@ var fs = require('fs');
 var request = require('request');
 var winston = require('winston');
 
-function readExampleFile (name, raw) {
+function readExampleFile(name, raw) {
     var text = fs.readFileSync(name, 'UTF8');
 
     if (raw) {
@@ -35,7 +35,7 @@ function readExampleFile (name, raw) {
     }
 }
 
-function deleteEntityCB (cbConfig, service, servicePath, cbEntityName, callback) {
+function deleteEntityCB(cbConfig, service, servicePath, cbEntityName, callback) {
     var optionsCB = {
         url: 'http://' + cbConfig.host + ':' + cbConfig.port + '/v2/entities/' + cbEntityName,
         method: 'DELETE',
@@ -46,7 +46,7 @@ function deleteEntityCB (cbConfig, service, servicePath, cbEntityName, callback)
         }
     };
 
-    request(optionsCB, function (error, response, body) {
+    request(optionsCB, function(error, response, body) {
         if (error) {
             winston.error(error);
         }
